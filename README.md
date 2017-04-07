@@ -14,5 +14,8 @@ Setting <code>crossOrigin = "Anonymous"</code> didn't work, I won't be able to a
 <p>
 I wouldn have worked on this more, however due to the upcoming finals I couldn't spend more time.  <br />
 Everything here were done within a night. <br />
+The project structure is based on the example from DroneDepoly.<br />
 Thank you!
 </p>
+
+
