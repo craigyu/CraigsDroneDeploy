@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Document</title>
+  <style>
+    #tile-list {
+      display: flex;
+      flex-direction: row;
+      flex: 1 1 0%;
+    }
+    
+    img {
+      width: 65px;
+      height: 65px;
+    }
+  </style>
+  <script src="script.js"></script>
+  <script src="Canvas2Image.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/0.4.1/html2canvas.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+    crossorigin="anonymous"></script>
+</head>
+
+<body>
+
+  <div>Craig's Dronedeploy App</div>
+  <div id="tile-list"></div>
+  <div id="imgTest"></div>
+  <canvas id="canvas"></canvas>
+  <script>
+    // Button's description
+    var button = document.createElement("button");
+    // Button styling
+    button.innerHTML = '<div><img style="width:100%;height:100%;" src="https://dronedeploy.gitbooks.io/dronedeploy-apps/content/logo%20with%20text%20app.png" /></div>';
+
+    var body = document.getElementsByTagName("body")[0];
+    body.appendChild(button);
+
+
+    // when clicked, this triggers stichImages, then in turn triggers rendering and saving in stichImages
+    button.addEventListener("click", function () {
+      new DroneDeploy({ version: 1 }).then(function (dronedeploy) {
+        dronedeploy.Plans.getCurrentlyViewed().then(function (plan) {
+          var zoom = 20;
+          dronedeploy.Tiles.get({ planId: plan.id, layerName: 'ortho', zoom: zoom })
+            .then(function (res) {
+              const tiles = getTilesFromGeometry(plan.geometry, res.template, zoom);
+              let map_length = Math.sqrt(tiles.length)
+              let tiles_url = [];
+              tiles.map((tileUrl) => {
+                tiles_url.push(tileUrl)
+              })
+              //console.log(tiles_url[0]);
+              stichImages(tiles_url, map_length);
+            });
+        });
+      });
+    });
+
+
+
+
+
+    // stich images together, input is an array of tile's url + the map length
+    function stichImages(urlArray, mapLen) {
+      //setting up sizes
+      let pdf_length = 256 * mapLen;
+      var canvas = document.getElementById('canvas');
+      var context = canvas.getContext('2d');
+      canvas.width = pdf_length;
+      canvas.height = pdf_length;
+
+      function loadImages(paths, whenloaded) {
+        var oneimgs = new Array();
+
+        //pre load the images before drawing
+        paths.forEach(function (path) {
+          var img = new Image;
+          img.onload = function () {
+            oneimgs.push(img);
+            if (oneimgs.length == paths.length) {
+              // console.log(oneimgs.length)
+              whenloaded(oneimgs);
+            }
+          }
+          img.src = path;
+        });
+      }
+
+      loadImages(urlArray, function (whenloaded) {
+        //re-ordering the array, the order was broken due the the last forEach
+        let backUp = [];
+        backUp = backUp.concat(whenloaded);
+        for (let i = 0; i < urlArray.length; i++) {
+          if (whenloaded[i].src != urlArray[i]) {
+            let index;
+            for (let j = 0; j < backUp.length; j++) {
+              let backUp_img = backUp[j];
+              let backUp_src = backUp_img.src;
+              if (backUp_src == urlArray[i]) {
+                index = j;
+                break;
+              }
+            }
+            whenloaded[i] = backUp[index];
+          }
+        }
+        //  console.log(whenloaded)
+
+
+        //draw the map onto the canvas 
+        for (let i = 0; i < mapLen; i++) {
+          let y = i * 256;
+          for (let j = 0; j < mapLen; j++) {
+            let x = j * 256;
+            let img = whenloaded.shift();
+            context.drawImage(img, x, y, 256, 256)
+          }
+        }
+
+        //This doesn't work on chrome due to the cross-origin restriction
+        html2canvas($("#canvas"), {
+          onrendered: function (canvas) {
+            var imgData = canvas.toDataURL(
+              'image/png');
+            var doc = new jsPDF();
+            doc.addImage(imgData, 'PNG', 0, 0, pdf_length, pdf_length);
+            doc.save('DroneMap.pdf');
+          }
+        });
+
+      });
+
+    }
+
+
+
+    //Below are the functions given by the examples
+    function getTilesFromGeometry(geometry, template, zoom) {
+      function long2tile(lon, zoom) {
+        return (Math.floor((lon + 180) / 360 * Math.pow(2, zoom)));
+      }
+      function lat2tile(lat, zoom) {
+        return (Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom)));
+      }
+      function replaceInTemplate(point) {
+        return template.replace('{z}', point.z)
+          .replace('{x}', point.x)
+          .replace('{y}', point.y);
+      }
+
+      var allLat = geometry.map(function (point) {
+        return point.lat;
+      });
+      var allLng = geometry.map(function (point) {
+        return point.lng;
+      });
+      var minLat = Math.min.apply(null, allLat);
+      var maxLat = Math.max.apply(null, allLat);
+      var minLng = Math.min.apply(null, allLng);
+      var maxLng = Math.max.apply(null, allLng);
+      var top_tile = lat2tile(maxLat, zoom); // eg.lat2tile(34.422, 9);
+      var left_tile = long2tile(minLng, zoom);
+      var bottom_tile = lat2tile(minLat, zoom);
+      var right_tile = long2tile(maxLng, zoom);
+
+      var tiles = [];
+      for (var y = top_tile; y < bottom_tile + 1; y++) {
+        for (var x = left_tile; x < right_tile + 1; x++) {
+          tiles.push(replaceInTemplate({ x, y, z: zoom }))
+        }
+      }
+      return tiles;
+    }
+
+  </script>
+</body>
+
+</html>
