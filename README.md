@@ -13,10 +13,14 @@ Setting <code>crossOrigin = "Anonymous"</code> didn't work, I won't be able to a
 A pdf file can be generated with no problem, but it's handicapped by the tainted canvas.
 </p>
 <p>
+<code>script.js</code> is the script file for jsPDF <br />
+</p>
+<p>
 I wouldn have worked on this more, however due to the upcoming finals I couldn't spend more time.  <br />
 Everything here were done within a night. <br />
 The project structure is based on the example from DroneDepoly.<br />
 Thank you!
 </p>
+
 
 
